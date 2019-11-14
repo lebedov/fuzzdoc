@@ -22,8 +22,7 @@ h = pydoc.Helper()
 def listmodules():
     modules = {}
     def callback(path, modname, desc, modules=modules):
-        if modname.find('.') < 0:
-            modules[modname] = 1
+        modules[modname] = 1
     def onerror(modname):
         callback(None, modname, None)
     pydoc.ModuleScanner().run(callback, onerror=onerror)
