@@ -1,0 +1,40 @@
+#!/usr/bin/env python3
+
+import argparse
+import pydoc
+import re
+import sys
+import warnings
+
+import iterfzf
+
+# Suppress irritating import warnings:
+warnings.simplefilter('ignore')
+
+parser = argparse.ArgumentParser('Fuzzy select topic to view with pydoc')
+parser.add_argument('filter', nargs='?',
+                    help='restrict search to partial matches on filter string')
+args = parser.parse_args()
+
+# XXX pydoc's module scanner is kind of slow - can it be replaced
+# by a faster approach? XXX
+h = pydoc.Helper()
+def listmodules():
+    modules = {}
+    def callback(path, modname, desc, modules=modules):
+        if modname.find('.') < 0:
+            modules[modname] = 1
+    def onerror(modname):
+        callback(None, modname, None)
+    pydoc.ModuleScanner().run(callback, onerror=onerror)
+    return list(modules)
+
+# If only one module survives filtering, pass it directly to pydoc:
+str_list = listmodules()+list(h.keywords)+list(h.topics)
+if args.filter:
+    str_list = list(filter(lambda s: re.search(args.filter, s), str_list))
+if len(str_list) > 1:
+    s = iterfzf.iterfzf(str_list)
+else:
+    s = str_list[0]
+help(s)
