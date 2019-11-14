@@ -33,8 +33,11 @@ def listmodules():
 str_list = listmodules()+list(h.keywords)+list(h.topics)
 if args.filter:
     str_list = list(filter(lambda s: re.search(args.filter, s), str_list))
-if len(str_list) > 1:
+n = len(str_list)
+if n > 1:
     s = iterfzf.iterfzf(str_list)
-else:
+elif n > 0:
     s = str_list[0]
+else:
+    raise RuntimeError('no matches found')
 help(s)
