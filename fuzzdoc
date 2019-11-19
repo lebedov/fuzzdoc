@@ -40,7 +40,7 @@ def find_py_pkgs(dir_list, name_list=[]):
 # XXX can this be made faster? XXX
 def find_py_defs(dir_list, verbose=False):
     """
-    Find all Python packages, modules, and the classes and functions 
+    Find all Python packages, modules, and the classes and functions
     defined in them in specified list of root directories.
     """
 
@@ -73,25 +73,27 @@ def find_py_defs(dir_list, verbose=False):
                         def_name_list.append('.'.join([pkg_name, inner_a.name]))
     return def_name_list
 
-# Suppress irritating import warnings:
-warnings.simplefilter('ignore')
+if __name__ == '__main__':
 
-parser = argparse.ArgumentParser('Fuzzy select topic to view with pydoc')
-parser.add_argument('filter', nargs='?',
-                    help='restrict search to partial matches on filter string')
-args = parser.parse_args()
+    # Suppress irritating import warnings:
+    warnings.simplefilter('ignore')
 
-h = pydoc.Helper()
+    parser = argparse.ArgumentParser('Fuzzy select topic to view with pydoc')
+    parser.add_argument('filter', nargs='?',
+                        help='restrict search to partial matches on filter string')
+    args = parser.parse_args()
 
-# If only one module survives filtering, pass it directly to pydoc:
-str_list = find_py_defs(sys.path)+list(h.keywords)+list(h.topics)
-if args.filter:
-    str_list = list(filter(lambda s: re.search(args.filter, s), str_list))
-n = len(str_list)
-if n > 1:
-    s = iterfzf.iterfzf(str_list)
-elif n > 0:
-    s = str_list[0]
-else:
-    raise RuntimeError('no matches found')
-help(s)
+    h = pydoc.Helper()
+
+    # If only one module survives filtering, pass it directly to pydoc:
+    str_list = find_py_defs(sys.path)+list(h.keywords)+list(h.topics)
+    if args.filter:
+        str_list = list(filter(lambda s: re.search(args.filter, s), str_list))
+    n = len(str_list)
+    if n > 1:
+        s = iterfzf.iterfzf(str_list)
+    elif n > 0:
+        s = str_list[0]
+    else:
+        raise RuntimeError('no matches found')
+    help(s)
