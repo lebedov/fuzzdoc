@@ -26,9 +26,9 @@ You can also download the source tarball, unpack, and run::
 Usage
 -----
 If specified without any arguments, fuzzdoc will list all found Python
-modules, keywords, and help topics; the selected topic will be displayed with pydoc.
-If a string is specified as an argument, it will be used to filter the list of available topics via substring 
-matching.
+keywords, pydoc help topics, packages, modules, and any public functions or
+classes defined in them and display the documentation of the selected item.
+If a string is specified as an argument, it is used to filter the list of available topics via substring matching.
 
 Author
 ------

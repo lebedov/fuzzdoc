@@ -1,12 +1,77 @@
 #!/usr/bin/env python3
 
 import argparse
+from ast import ClassDef, FunctionDef, parse
+import pathlib
 import pydoc
+import os
 import re
 import sys
 import warnings
 
 import iterfzf
+
+def find_py_pkgs(dir_list, name_list=[]):
+    """
+    Find all Python packages in specified list of root directories.
+    """
+
+    out_dir_list = []
+    out_name_list = []
+    for i, p in enumerate(dir_list):
+        p = pathlib.Path(p)
+        if not p.is_dir():
+            continue
+        sub_dir_list = [f for f in p.glob('*') if \
+                        f.is_dir() and f.joinpath('__init__.py').exists()]
+        if name_list:
+            sub_name_list = ['.'.join([name_list[i], f.name]) \
+                             for f in sub_dir_list]
+        else:
+            sub_name_list = [f.name for f in sub_dir_list]
+        out_dir_list.extend(sub_dir_list)
+        out_name_list.extend(sub_name_list)
+        if sub_dir_list:
+            d, n = find_py_pkgs(sub_dir_list, sub_name_list)
+            out_dir_list.extend(d)
+            out_name_list.extend(n)
+    return out_dir_list, out_name_list
+
+# XXX can this be made faster? XXX
+def find_py_defs(dir_list, verbose=False):
+    """
+    Find all Python packages, modules, and the classes and functions 
+    defined in them in specified list of root directories.
+    """
+
+    pkg_dir_list, pkg_name_list = find_py_pkgs(sys.path)
+    def_name_list = []
+    for pkg_dir, pkg_name in zip(pkg_dir_list, pkg_name_list):
+        def_name_list.append(pkg_name)
+        mod_file_list = list(pathlib.Path(pkg_dir).glob('*.py'))
+        for file_name in mod_file_list:
+            if file_name.parts[-1] == '__init__.py':
+                continue
+            def_name_list.append('.'.join([pkg_name,
+                                    os.path.splitext(file_name.parts[-1])[0]]))
+            with open(file_name) as f:
+                try:
+                    src = f.read()
+                except Exception as e:
+                    if verbose:
+                        print('read error - skipping %s' % file_name)
+                    continue
+            try:
+                a = parse(src)
+            except Exception as e:
+                if verbose:
+                    print('parse error - skipping %s' % file_name)
+                continue
+            if hasattr(a, 'body') and isinstance(a.body, list):
+                for inner_a in a.body:
+                    if isinstance(inner_a, (ClassDef, FunctionDef)) and inner_a.name[0] != '_':
+                        def_name_list.append('.'.join([pkg_name, inner_a.name]))
+    return def_name_list
 
 # Suppress irritating import warnings:
 warnings.simplefilter('ignore')
@@ -16,20 +81,10 @@ parser.add_argument('filter', nargs='?',
                     help='restrict search to partial matches on filter string')
 args = parser.parse_args()
 
-# XXX pydoc's module scanner is kind of slow - can it be replaced
-# by a faster approach? XXX
 h = pydoc.Helper()
-def listmodules():
-    modules = {}
-    def callback(path, modname, desc, modules=modules):
-        modules[modname] = 1
-    def onerror(modname):
-        callback(None, modname, None)
-    pydoc.ModuleScanner().run(callback, onerror=onerror)
-    return list(modules)
 
 # If only one module survives filtering, pass it directly to pydoc:
-str_list = listmodules()+list(h.keywords)+list(h.topics)
+str_list = find_py_defs(sys.path)+list(h.keywords)+list(h.topics)
 if args.filter:
     str_list = list(filter(lambda s: re.search(args.filter, s), str_list))
 n = len(str_list)
