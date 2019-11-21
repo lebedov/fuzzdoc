@@ -73,17 +73,21 @@ def find_py_defs(dir_list, processes=10, verbose=False):
 
     if processes is not None:
         pool = mp.Pool(processes=processes)
-        map_func = pool.map
+        map_func = pool.starmap
     else:
-        map_func = map
+        map_func = itertools.starmap
     pkg_dir_list, pkg_name_list = find_py_pkgs(sys.path)
     def_name_list = []
+    mod_file_list = []
+    mod_pkg_name_list = []
     for pkg_dir, pkg_name in zip(pkg_dir_list, pkg_name_list):
         def_name_list.append(pkg_name)
-        mod_file_list = pathlib.Path(pkg_dir).glob('*.py')
-        func = functools.partial(get_class_func_defs, pkg_name=pkg_name, verbose=verbose)
-        tmp = itertools.chain.from_iterable(map_func(func, mod_file_list))
-        def_name_list.extend(tmp)
+        tmp = list(pathlib.Path(pkg_dir).glob('*.py'))
+        mod_file_list.extend(tmp)
+        mod_pkg_name_list.extend([pkg_name]*len(tmp))
+    func = functools.partial(get_class_func_defs, verbose=verbose)
+    def_name_list = list(itertools.chain.from_iterable(map_func(func,
+        zip(mod_file_list, mod_pkg_name_list))))
     return def_name_list
 
 if __name__ == '__main__':
@@ -99,7 +103,10 @@ if __name__ == '__main__':
     h = pydoc.Helper()
 
     # If only one module survives filtering, pass it directly to pydoc:
+    import time
+    start = time.time()
     str_list = find_py_defs(sys.path, mp.cpu_count())+list(h.keywords)+list(h.topics)
+    print(time.time()-start)
     if args.filter:
         str_list = list(filter(lambda s: re.search(args.filter, s), str_list))
     n = len(str_list)
