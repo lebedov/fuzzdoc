@@ -7,7 +7,7 @@ from setuptools import find_packages
 from setuptools import setup
 
 NAME =               'fuzzdoc'
-VERSION =            '0.1.1'
+VERSION =            '0.1.2'
 AUTHOR =             'Lev E. Givon'
 AUTHOR_EMAIL =       'lev@columbia.edu'
 URL =                'https://github.com/lebedov/fuzzdoc/'

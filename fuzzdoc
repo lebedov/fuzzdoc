@@ -99,7 +99,7 @@ if __name__ == '__main__':
     h = pydoc.Helper()
 
     # If only one module survives filtering, pass it directly to pydoc:
-    str_list = find_py_defs(sys.path, 10)+list(h.keywords)+list(h.topics)
+    str_list = find_py_defs(sys.path, mp.cpu_count())+list(h.keywords)+list(h.topics)
     if args.filter:
         str_list = list(filter(lambda s: re.search(args.filter, s), str_list))
     n = len(str_list)
