@@ -2,6 +2,9 @@
 
 import argparse
 from ast import ClassDef, FunctionDef, parse
+import functools
+import itertools
+import multiprocessing as mp
 import pathlib
 import pydoc
 import os
@@ -37,40 +40,50 @@ def find_py_pkgs(dir_list, name_list=[]):
             out_name_list.extend(n)
     return out_dir_list, out_name_list
 
-# XXX can this be made faster? XXX
-def find_py_defs(dir_list, verbose=False):
+def get_class_func_defs(file_name, pkg_name, verbose=False):
+    if file_name.parts[-1] == '__init__.py':
+        return []
+    def_name_list = []
+    def_name_list.append('.'.join([pkg_name,
+                        os.path.splitext(file_name.parts[-1])[0]]))
+    with open(file_name) as f:
+        try:
+            src = f.read()
+        except Exception as e:
+            if verbose:
+                print('read error - skipping %s' % file_name)
+            return def_name_list
+    try:
+        a = parse(src)
+    except Exception as e:
+        if verbose:
+            print('parse error - skipping %s' % file_name)
+        return def_name_list
+    if hasattr(a, 'body') and isinstance(a.body, list):
+        for inner_a in a.body:
+            if isinstance(inner_a, (ClassDef, FunctionDef)) and inner_a.name[0] != '_':
+                def_name_list.append('.'.join([pkg_name, inner_a.name]))
+    return def_name_list
+
+def find_py_defs(dir_list, processes=10, verbose=False):
     """
     Find all Python packages, modules, and the classes and functions
     defined in them in specified list of root directories.
     """
 
+    if processes is not None:
+        pool = mp.Pool(processes=processes)
+        map_func = pool.map
+    else:
+        map_func = map
     pkg_dir_list, pkg_name_list = find_py_pkgs(sys.path)
     def_name_list = []
     for pkg_dir, pkg_name in zip(pkg_dir_list, pkg_name_list):
         def_name_list.append(pkg_name)
-        mod_file_list = list(pathlib.Path(pkg_dir).glob('*.py'))
-        for file_name in mod_file_list:
-            if file_name.parts[-1] == '__init__.py':
-                continue
-            def_name_list.append('.'.join([pkg_name,
-                                    os.path.splitext(file_name.parts[-1])[0]]))
-            with open(file_name) as f:
-                try:
-                    src = f.read()
-                except Exception as e:
-                    if verbose:
-                        print('read error - skipping %s' % file_name)
-                    continue
-            try:
-                a = parse(src)
-            except Exception as e:
-                if verbose:
-                    print('parse error - skipping %s' % file_name)
-                continue
-            if hasattr(a, 'body') and isinstance(a.body, list):
-                for inner_a in a.body:
-                    if isinstance(inner_a, (ClassDef, FunctionDef)) and inner_a.name[0] != '_':
-                        def_name_list.append('.'.join([pkg_name, inner_a.name]))
+        mod_file_list = pathlib.Path(pkg_dir).glob('*.py')
+        func = functools.partial(get_class_func_defs, pkg_name=pkg_name, verbose=verbose)
+        tmp = itertools.chain.from_iterable(map_func(func, mod_file_list))
+        def_name_list.extend(tmp)
     return def_name_list
 
 if __name__ == '__main__':
@@ -86,7 +99,7 @@ if __name__ == '__main__':
     h = pydoc.Helper()
 
     # If only one module survives filtering, pass it directly to pydoc:
-    str_list = find_py_defs(sys.path)+list(h.keywords)+list(h.topics)
+    str_list = find_py_defs(sys.path, 10)+list(h.keywords)+list(h.topics)
     if args.filter:
         str_list = list(filter(lambda s: re.search(args.filter, s), str_list))
     n = len(str_list)
